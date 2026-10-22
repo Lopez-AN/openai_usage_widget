@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OpenAIUsageWidget.Core/OpenAIUsageWidget.Core.csproj" />
+    <Project Path="src/OpenAIUsageWidget/OpenAIUsageWidget.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OpenAIUsageWidget.Tests/OpenAIUsageWidget.Tests.csproj" />
+  </Folder>
+</Solution>

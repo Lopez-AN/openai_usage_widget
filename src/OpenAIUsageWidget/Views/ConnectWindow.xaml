@@ -1,0 +1,29 @@
+<Window x:Class="OpenAIUsageWidget.Views.ConnectWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Conectar cuenta de ChatGPT" Width="470" SizeToContent="Height" ResizeMode="NoResize"
+        Background="{StaticResource WindowBrush}" WindowStartupLocation="CenterScreen">
+    <StackPanel Margin="24">
+        <TextBlock Text="Conectá tu cuenta" FontSize="23" FontWeight="SemiBold" />
+        <TextBlock Text="El inicio de sesión se realiza en el navegador de OpenAI.&#x0a;El widget no pide tu contraseña ni una API key." Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,10,0,20" />
+        <TextBlock Text="Nombre para identificarla" FontSize="12" Margin="0,0,0,6" />
+        <TextBox x:Name="AccountName" Text="Mi cuenta" MaxLength="60" AutomationProperties.Name="Nombre de la cuenta" />
+        <Border x:Name="ConnectorHint" Background="#25221B" CornerRadius="9" Padding="12" Margin="0,16,0,0" Visibility="Collapsed">
+            <StackPanel>
+                <TextBlock Text="Falta el conector de cuotas" FontWeight="SemiBold" FontSize="13" />
+                <TextBlock Text="Esta versión usa Codex CLI como puente oficial para autenticar y leer cuotas. No reemplaza OpenCode, no ejecuta modelos y no se instala automáticamente." TextWrapping="Wrap" Foreground="#D4C6AA" FontSize="12" Margin="0,7,0,12" />
+                <WrapPanel>
+                    <Button Style="{StaticResource FlatButton}" Content="Descarga oficial" Click="Download_Click" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource FlatButton}" Content="Indicar ubicación" Click="Configure_Click" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+        <TextBlock Text="Solo lectura: no se pueden canjear reseteos, comprar créditos ni consumir cuota desde este widget." Foreground="#8CDCBF" FontSize="11" TextWrapping="Wrap" Margin="0,17,0,0" />
+        <TextBlock x:Name="StatusText" TextWrapping="Wrap" Foreground="#E6BC76" FontSize="12" Margin="0,14,0,0" />
+        <ProgressBar x:Name="BusyIndicator" IsIndeterminate="True" Height="3" Margin="0,12,0,0" Visibility="Collapsed" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,19,0,0">
+            <Button x:Name="CancelButton" Style="{StaticResource FlatButton}" Content="Cancelar" Click="Cancel_Click" Margin="0,0,8,0" />
+            <Button x:Name="ConnectButton" Style="{StaticResource FlatButton}" Background="#086C52" Content="Iniciar sesión con ChatGPT" Click="Connect_Click" />
+        </StackPanel>
+    </StackPanel>
+</Window>
