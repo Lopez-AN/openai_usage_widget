@@ -11,6 +11,7 @@
     <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="OpenAIUsageWidget.Tests" />
     <ProjectReference Include="../OpenAIUsageWidget.Core/OpenAIUsageWidget.Core.csproj" />
   </ItemGroup>
 </Project>

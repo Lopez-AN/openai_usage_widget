@@ -8,19 +8,38 @@ Miniapp de escritorio para Windows 11, escrita en **C# / WPF / .NET 10**. Muestr
 - Refresco cada 5 minutos, manual para la cuenta seleccionada y de datos vencidos al reanudar Windows.
 - Fecha/hora local del último refresco **exitoso por cuenta**. Un error no adelanta esa fecha ni borra la última lectura.
 - Ventana sin bordes ni botón en la barra de tareas; se coloca inmediatamente por encima del escritorio y por debajo de las aplicaciones. No es un widget de Win+W.
-- Icono de notificación para configuración, restaurar posición y salir. Inicio con Windows opcional, desactivado de fábrica.
+- Icono de notificación para configuración, restaurar posición y salir. Inicio con Windows opcional: activado por defecto en el instalador, desactivado en la distribución portable.
 
-## Ejecutar
+## Instalar sin administrador
 
-Requiere Windows 11 de 64 bits y el **SDK de .NET 10** para desarrollar. No hace falta Visual Studio completo.
+Ejecutá `OpenAIUsageWidget-<versión>-win-x64-Setup.exe` con tu usuario normal, **sin usar «Ejecutar como administrador»**. Requiere Windows 11 de 64 bits; no requiere instalar .NET ni el SDK.
 
-Desde PowerShell, en la raíz del repositorio:
+- Instala los binarios en `%LOCALAPPDATA%\Programs\OpenAIUsageWidget` y crea un acceso directo en el menú Inicio de ese usuario.
+- No solicita elevación/UAC, no instala servicios ni escribe en `HKLM` o `Program Files`.
+- La casilla **Iniciar el widget al entrar en Windows** viene marcada. Se puede desmarcar en el instalador o cambiar después desde Configuración → Guardar. Usa el valor `OpenAIUsageWidget` en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, con la ruta del ejecutable entre comillas.
+- Una actualización conserva las cuentas, la posición y las preferencias; también respeta si desactivaste el inicio automático desde la app. Cerrá el widget desde su icono de notificación → **Salir** antes de actualizar o desinstalar. El instalador lo comprueba y no lo termina a la fuerza.
+- Se desinstala desde **Configuración de Windows → Aplicaciones → Aplicaciones instaladas** sin administrador. Quita los binarios, el acceso directo y la entrada de inicio automático, incluso si la activaste después de instalar.
+- Los datos en `%LOCALAPPDATA%\OpenAIUsageWidget` y las credenciales protegidas se conservan al desinstalar. Para cerrar las sesiones, quitá las cuentas desde Configuración del widget **antes** de desinstalar.
+
+El instalador incluye .NET, pero **no incluye ni descarga Codex CLI**: para conectar cuentas sigue siendo necesario instalar el conector por separado, como se explica abajo. Un ejecutable sin firma puede mostrar un aviso de SmartScreen; eso es independiente de los permisos de administrador.
+
+## Preparar y compilar
+
+Requiere Windows 11 de 64 bits y el **SDK de .NET 10**. No hace falta Visual Studio completo. Para descargar con WinGet las dependencias que falten (SDK de .NET 10 e Inno Setup 7, este último instalado solo para el usuario), ejecutá una vez:
 
 ```powershell
-.\run.ps1
+.\setup-build-deps.ps1
 ```
 
-El script compila y abre la app sin mantener una consola adicional. También se puede compilar y abrir el ejecutable directamente:
+WinGet puede pedir aceptar los acuerdos de cada paquete. La instalación del SDK de .NET puede solicitar UAC; si no tenés permisos de administrador, pedí que lo instale el administrador del equipo. Inno Setup se instala por usuario. El widget instalado y su instalador final no requieren administrador.
+
+Desde PowerShell, en la raíz del repositorio, compilá sin ejecutar la app:
+
+```powershell
+.\build.ps1
+```
+
+Después de compilar, podés abrir el ejecutable directamente:
 
 ```powershell
 dotnet build OpenAIUsageWidget.slnx -c Release
@@ -76,7 +95,7 @@ Si falla Internet o vence la sesión, se conserva la última lectura con adverte
 
 El panel conserva su posición relativa al host de iconos de Explorer, sin `Topmost`, sin inyectar código en Explorer y sin reemplazar el atajo Win+D. Se vuelve a detectar el host si cambia, incluyendo la jerarquía de Windows 11 24H2. Un evento de primer plano y una comprobación liviana cada 2 segundos recuperan la posición sin activar el panel.
 
-**La jerarquía interna del escritorio no es un contrato estable de Microsoft.** Hay que validar Win+D en la compilación concreta de Windows; una actualización o un shell alternativo puede requerir ajustes. No se modifica el registro del sistema para corregirlo. La única entrada de registro opcional es el inicio automático del usuario, al activar expresamente esa casilla.
+**La jerarquía interna del escritorio no es un contrato estable de Microsoft.** Hay que validar Win+D en la compilación concreta de Windows; una actualización o un shell alternativo puede requerir ajustes. No se modifica el registro del sistema para corregirlo. El inicio automático utiliza una entrada opcional del usuario en `HKCU`, controlada por la casilla del instalador o de Configuración.
 
 Comprobación manual:
 
@@ -102,11 +121,9 @@ La suite es un ejecutable de pruebas **sin dependencias NuGet de terceros**; dev
 dotnet run --project tests/OpenAIUsageWidget.Tests
 ```
 
-La demostración usa datos **ficticios**, está rotulada, no conecta cuentas y no modifica la configuración real:
+La demostración usa datos **ficticios**, está rotulada, no conecta cuentas y no modifica la configuración real. Compilá con `build.ps1` y luego ejecutá:
 
 ```powershell
-.\run.ps1 -Demo
-# O con el ejecutable ya compilado:
 .\src\OpenAIUsageWidget\bin\Release\net10.0-windows\OpenAIUsageWidget.exe --demo
 ```
 
@@ -127,11 +144,38 @@ dotnet publish src/OpenAIUsageWidget -c Release -r win-x64 --self-contained true
 
 Copiá **toda** la carpeta publicada. Esa distribución incluye .NET, pero el conector de cuentas sigue siendo una dependencia separada y explícita. No se incluye ni se descarga Codex en la publicación.
 
+## Generar el instalador
+
+Para **compilar** el instalador se necesitan el SDK de .NET 10 e [Inno Setup 6.7 o posterior (también 7)](https://jrsoftware.org/isdl.php). `setup-build-deps.ps1` detecta e instala estas dependencias si faltan; no son necesarias en el equipo donde se instala el widget.
+
+```powershell
+.\build-installer.ps1
+# Si ISCC.exe no está en PATH ni en una ubicación habitual:
+.\build-installer.ps1 -IsccPath 'C:\Herramientas\Inno Setup\ISCC.exe'
+```
+
+El script publica una carpeta temporal nueva de Windows x64 con .NET incluido y compila `installer\OpenAIUsageWidget.iss`. Usa la versión de `src\OpenAIUsageWidget\OpenAIUsageWidget.csproj`; el resultado queda en `artifacts\installer\OpenAIUsageWidget-<versión>-win-x64-Setup.exe`. Solo elimina su propia carpeta temporal y no instala el widget en el equipo de compilación.
+
+Para una instalación silenciosa se pueden usar `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`. El inicio automático se activa en la primera instalación y se conserva en actualizaciones; `/TASKS=""` lo desactiva explícitamente y `/TASKS="autostart"` lo activa. La ejecución silenciosa no abre el widget al terminar.
+
+### Validación del instalador
+
+Las pruebas automatizadas de inicio automático usan claves temporales aisladas en `HKCU`, nunca la entrada real de inicio del usuario. La generación del instalador no lo ejecuta. Para comprobar el ciclo completo, usar una cuenta estándar de prueba o una VM de Windows 11:
+
+1. Instalar sin elevación, con la casilla marcada: comprobar la ruta bajo `LocalAppData\Programs`, el acceso directo, Aplicaciones instaladas y el valor `HKCU\...\Run\OpenAIUsageWidget`.
+2. Abrir Configuración: la casilla debe estar marcada aunque `settings.json` no existiera antes. Desactivarla y guardar; verificar que se elimina el valor de inicio. Cerrar sesión y volver a entrar para comprobar el arranque cuando esté activado.
+3. Desactivar el inicio desde la app, cerrar el widget y volver a ejecutar el instalador: la casilla debe seguir desmarcada y las cuentas/posición deben conservarse.
+4. Probar una instalación con la casilla desmarcada, activarla después desde la app y desinstalar: debe desaparecer la entrada de inicio igualmente, sin borrar otros valores de `Run` ni los datos del widget.
+5. Probar actualizar/desinstalar con el widget abierto: debe pedir cerrarlo. Repetir con un nombre de usuario que contenga espacios y sin .NET instalado globalmente.
+
 ## Estructura
 
 - `src/OpenAIUsageWidget.Core`: modelos, persistencia, traducción de cuotas y conector con lista de RPC permitidos.
 - `src/OpenAIUsageWidget`: WPF, cuentas, configuración, temporizadores, bandeja y capa de escritorio.
 - `tests/OpenAIUsageWidget.Tests`: pruebas de negocio, almacenamiento, interfaz de estado y transporte simulado.
+- `build.ps1`: compila el widget sin ejecutarlo.
+- `setup-build-deps.ps1`: instala con WinGet las herramientas de compilación que falten.
+- `installer/OpenAIUsageWidget.iss` / `build-installer.ps1`: instalador por usuario y publicación autocontenida reproducible.
 - `main.png` / `dropdown.png`: referencias originales del diseño, conservadas sin modificar.
 
 Licencia: Apache-2.0. Proyecto independiente, no afiliado a OpenAI.

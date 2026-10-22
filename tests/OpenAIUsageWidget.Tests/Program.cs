@@ -1,6 +1,8 @@
 using System.IO;
 using System.Text.Json;
+using Microsoft.Win32;
 using OpenAIUsageWidget.Core;
+using OpenAIUsageWidget.Desktop;
 using OpenAIUsageWidget.Presentation;
 
 if (args.Contains("app-server"))
@@ -106,6 +108,41 @@ Test("No se abren direcciones de login suplantadas", () =>
     Check.True(ReadOnlyRpcPolicy.IsSafeLoginUrl(new Uri("https://auth.openai.com/oauth/authorize")));
     foreach (var url in new[] { "http://auth.openai.com", "https://auth.openai.com.evil.invalid", "https://evil.invalid", "https://name@auth.openai.com", "https://auth.openai.com:1234", "file:///C:/test.exe" })
         Check.True(!ReadOnlyRpcPolicy.IsSafeLoginUrl(new Uri(url)));
+});
+Test("El inicio automático lee la entrada del instalador y cita rutas con espacios", () =>
+{
+    using var registry = new TestRegistryKey();
+    Check.True(!StartupRegistration.IsEnabled(null));
+    Check.True(!StartupRegistration.IsEnabled(registry.Key));
+    const string executable = @"C:\Users\Usuario de prueba\AppData\Local\Programs\OpenAIUsageWidget\OpenAIUsageWidget.exe";
+    registry.Key.SetValue("OpenAIUsageWidget", $"\"{executable}\""); // Same entry written by Inno Setup.
+    Check.True(StartupRegistration.IsEnabled(registry.Key));
+    StartupRegistration.SetEnabled(registry.Key, false, null);
+    Check.True(!StartupRegistration.IsEnabled(registry.Key));
+    StartupRegistration.SetEnabled(registry.Key, true, executable);
+    Check.Equal($"\"{executable}\"", registry.Key.GetValue("OpenAIUsageWidget"));
+    Check.Equal(RegistryValueKind.String, registry.Key.GetValueKind("OpenAIUsageWidget"));
+});
+Test("Desactivar inicio automático no borra otras entradas y es idempotente", () =>
+{
+    using var registry = new TestRegistryKey();
+    registry.Key.SetValue("OtraAplicacion", "no tocar");
+    StartupRegistration.SetEnabled(registry.Key, true, @"C:\Widget\OpenAIUsageWidget.exe");
+    StartupRegistration.SetEnabled(registry.Key, false, null);
+    StartupRegistration.SetEnabled(registry.Key, false, null);
+    Check.True(!StartupRegistration.IsEnabled(registry.Key));
+    Check.Equal("no tocar", registry.Key.GetValue("OtraAplicacion"));
+    registry.Key.SetValue("OpenAIUsageWidget", "  ");
+    Check.True(!StartupRegistration.IsEnabled(registry.Key));
+});
+Test("El inicio automático valida ejecutables y admite dotnet con rutas citadas", () =>
+{
+    using var registry = new TestRegistryKey();
+    Check.Throws<InvalidOperationException>(() => StartupRegistration.SetEnabled(registry.Key, true, null));
+    Check.Throws<InvalidOperationException>(() => StartupRegistration.SetEnabled(registry.Key, true, @"C:\Program Files\dotnet\dotnet.exe"));
+    Check.True(!StartupRegistration.IsEnabled(registry.Key));
+    StartupRegistration.SetEnabled(registry.Key, true, @"C:\Program Files\dotnet\dotnet.exe", @"C:\Mi Widget\OpenAIUsageWidget.dll");
+    Check.Equal("\"C:\\Program Files\\dotnet\\dotnet.exe\" \"C:\\Mi Widget\\OpenAIUsageWidget.dll\"", registry.Key.GetValue("OpenAIUsageWidget"));
 });
 AsyncTest("Se persisten varias cuentas, selección, posición y última lectura", async () =>
 {
@@ -333,6 +370,18 @@ sealed class StubUsageService : IAccountUsageService
         Task.FromResult(new LoginResult("example@example.invalid", "plus", Snapshot()));
     public Task LogoutAsync(Guid profileId, CancellationToken cancellationToken)
     { LogoutIds.Add(profileId); return Task.CompletedTask; }
+}
+
+sealed class TestRegistryKey : IDisposable
+{
+    private readonly string _path = @"Software\OpenAIUsageWidget.Tests\" + Guid.NewGuid().ToString("N");
+    public RegistryKey Key { get; }
+    public TestRegistryKey() => Key = Registry.CurrentUser.CreateSubKey(_path);
+    public void Dispose()
+    {
+        Key.Dispose();
+        Registry.CurrentUser.DeleteSubKeyTree(_path); // Only this test's fresh GUID key, never HKCU Run.
+    }
 }
 
 sealed class TestDirectory : IDisposable

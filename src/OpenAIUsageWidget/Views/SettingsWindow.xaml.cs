@@ -16,7 +16,14 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         DataContext = model;
         ExecutableText.Text = model.Settings.CodexExecutablePath ?? "";
-        AutostartCheck.IsChecked = model.Settings.StartWithWindows;
+        // The installer can change HKCU without editing the user's settings.json.
+        // Offline demo/diagnostic views must not access the real startup setting.
+        try { AutostartCheck.IsChecked = model.IsDemo ? model.Settings.StartWithWindows : StartupRegistration.IsEnabled(); }
+        catch
+        {
+            AutostartCheck.IsEnabled = false;
+            StatusText.Text = "No se pudo consultar el inicio automático de este usuario.";
+        }
         AccountList.SelectedItem = model.SelectedAccount;
     }
 
@@ -65,13 +72,14 @@ public partial class SettingsWindow : Window
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
+        if (_model.IsDemo) return;
         var path = ExecutableText.Text.Trim();
         if (path.Length > 0 && CodexExecutable.Find(path) is null)
         { StatusText.Text = "La ruta debe apuntar a un codex.exe o codex.cmd existente."; return; }
         await ExecuteAsync(async () =>
         {
-            var enabled = AutostartCheck.IsChecked == true;
-            if (enabled != _model.Settings.StartWithWindows) StartupRegistration.SetEnabled(enabled);
+            var enabled = AutostartCheck.IsEnabled ? AutostartCheck.IsChecked == true : _model.Settings.StartWithWindows;
+            if (AutostartCheck.IsEnabled) StartupRegistration.SetEnabled(enabled);
             await _model.ConfigureAsync(path, enabled);
             StatusText.Text = _model.StorageError ?? "Configuración guardada.";
         });
